@@ -266,7 +266,7 @@ fn read_sattestation(path: &str) -> Result<String, IoError> {
 fn print_sat_token_content(indent: &str, sattestee_token: &Vec<&str>) -> String {
     // Strip leading and trailing '{' and '}'
     let mut content = String::new();
-    sattestee_token.iter().filter(|&v| v != &"}" || v != &"{").map(|&v| v.replace("=", "\": \"")).for_each(|v| write!(&mut content, "{}\"{}\",\n", indent, v).unwrap());
+    sattestee_token.iter().filter(|&v| v != &"}" || v != &"{").map(|&v| v.replacen("=", "\": \"", 1)).for_each(|v| write!(&mut content, "{}\"{}\",\n", indent, v).unwrap());
     // Truncate the final ',' (pop the final new line, and then re-add it)
     content.pop();
     content.pop();
@@ -279,7 +279,7 @@ fn construct_sat_token(sattestee: &Vec<&str>) -> Result<String, IoError> {
       return Err(IoError::new(ErrorKind::InvalidData, "Sattestee invalid length".to_string()));
     }
     let mut sat = String::new();
-    sattestee.iter().map(|&v| v.replace("=", "\":\"")).for_each(|v| write!(&mut sat, "\"{}\",", v).unwrap());
+    sattestee.iter().map(|&v| v.replacen("=", "\":\"", 1)).for_each(|v| write!(&mut sat, "\"{}\",", v).unwrap());
     // Truncate the final ','
     sat.pop();
     //sat.push_str(&format!("{{"\"sattestee\":   \"{}\",\n", sat_indent, sattestee[0]));
