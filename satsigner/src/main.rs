@@ -13,6 +13,8 @@ use std::path::Path;
 
 use rand::prelude::*;
 
+use std::collections::HashMap;
+
 extern crate base64;
 extern crate ed25519_dalek;
 
@@ -367,31 +369,43 @@ fn make_sat_list(expanded_sec_key: &ExpandedSecretKey, public_key: &PublicKey, h
     format!("{{\n  \"sattestation\": {},\n  \"signature\": \"{}\"\n}}", msg, b64)
 }
 
-fn make_sat_tokens(expanded_sec_key: &ExpandedSecretKey, public_key: &PublicKey, hostname: &str, onionaddr: &str, sattestations: &str, sattestor_labels: &str) -> Vec<String> {
-  let mut tokens = Vec::new();
+fn make_sat_credential(expanded_sec_key: &ExpandedSecretKey, public_key: &PublicKey, hostname: &str, onionaddr: &str, sattestations: &str, sattestor_labels: &str) -> HashMap<String, String> {
+  let mut credentials = HashMap::new();
   for s in sattestations.split(";") {
     let sattestee: Vec<&str> = s.split(":").collect();
     if sattestee.len() != 5 {
+      println!("Invalid sattestation format: '{}'", s);
       continue;
     }
-    let mut unsigned_token = String::new();
-    let mut signed_token = String::new();
+    let mut unsigned_credential = String::new();
+    let mut signed_credential = String::new();
     let header = construct_sat_token_header(hostname, onionaddr, sattestor_labels, "", "");
-    let token = construct_sat_token(&sattestee).unwrap();
-    write!(unsigned_token, "{{{}{}}}", header, token).expect("Writing unsigned token failed");
+    let credential = construct_sat_token(&sattestee).unwrap();
+    write!(unsigned_credential, "{{{}{}}}", header, credential).expect("Writing unsigned credential failed");
 
-    let tagged_token = format!("{}{}", "sattestation-token-v0", unsigned_token);
-    let sig = expanded_sec_key.sign(tagged_token.as_bytes(), &public_key).to_bytes();
+    let tagged_credential = format!("{}{}", "sattestation-credential-v0", unsigned_credential);
+    let sig = expanded_sec_key.sign(tagged_credential.as_bytes(), &public_key).to_bytes();
 
-    assert!(public_key.verify(tagged_token.as_bytes(), &Signature::from_bytes(&sig).unwrap()).is_ok());
+    assert!(public_key.verify(tagged_credential.as_bytes(), &Signature::from_bytes(&sig).unwrap()).is_ok());
 
     let b64_sig = base64::encode(&sig as &[u8]);
 
-    write!(signed_token, "{{sattestation:{},signature:{}}}", unsigned_token, b64_sig).expect("Writing signed token failed");
-    let b64_token = base64::encode(&signed_token.as_bytes());
-    tokens.push(b64_token);
+    write!(signed_credential, "{{\"sattestation\":{},\"signature\":\"{}\"}}", unsigned_credential, b64_sig).expect("Writing signed credential failed");
+    let b64_credential = base64::encode(&signed_credential.as_bytes());
+    let sattestee_domain = sattestee[0].to_string();
+    let sattestee_domain_sep = sattestee_domain.find("=");
+    let sattestee_domain_sep = sattestee_domain_sep.unwrap();
+    // Strip the quotes
+    let sattestee_domain = &sattestee_domain[(sattestee_domain_sep + 1)..(sattestee_domain.len())];
+    let sattestee_onion = sattestee[1].to_string();
+    let sattestee_onion_sep = sattestee_onion.find("=");
+    let sattestee_onion_sep = sattestee_onion_sep.unwrap();
+    // Strip the quotes
+    let sattestee_onion = &sattestee_onion[(sattestee_onion_sep + 1)..(sattestee_onion.len())];
+    let sat = format!("{}onion.{}", sattestee_onion, sattestee_domain);
+    credentials.insert(sat.to_string(), b64_credential);
   }
-  tokens
+  credentials
 }
 
 
@@ -682,6 +696,12 @@ fn main() {
 
     let satlist = make_sat_list(&expanded_sec_key, &public_key, &hostname, &onionaddr, &sattestations, &sattestor_labels);
     write_file(&outdir, "sattestation.json", &satlist);
+
+    let credentials = make_sat_credential(&expanded_sec_key, &public_key, &hostname, &onionaddr, &sattestations, &sattestor_labels);
+    for (name, credential) in &credentials {
+        let outfile = format!("{}_credential.json", name);
+        write_file(&outdir, &outfile, &credential);
+    }
 }
 
 #[cfg(test)]
@@ -779,26 +799,44 @@ mod tests {
           }
       };
 
-      let sat_tokens = make_sat_tokens(&expanded_sec_key, &public_key, hostname, onionaddr, &sattestations, "*");
+      let sat_creds = make_sat_credential(&expanded_sec_key, &public_key, hostname, onionaddr, &sattestations, "*");
 
-      assert!(sat_tokens.len() > 0);
+      assert!(sat_creds.len() > 0);
+      let one_sat_cred = sat_creds.get(&"hllvtjcjomneltczwespyle2ihuaq5hypqaavn3is6a7t2dojuaa6rydonion.satis.system33.pw".to_string()).unwrap();
         
-      let expected_unsigned_sat_tokens = "{\"sat_list_version\":\"1\",\"sattestor_domain\":\"sata.example.org\",\"sattestor_onion\":\"l4yxbgn74e6ukw6zv3jojaf6bkqlgea2ny37ocry2i4xartdjkqqxwid\",\"sattestor_labels\":\"*\",\"domain\":\"satis.system33.pw\",\"onion\":\"hllvtjcjomneltczwespyle2ihuaq5hypqaavn3is6a7t2dojuaa6ryd\",\"labels\":\"news\",\"valid_after\":\"2020-04-30\",\"refreshed_on\":\"2020-05-15\"}";
+      let expected_unsigned_sat_cred = "{\"sat_list_version\":\"1\",\"sattestor_domain\":\"sata.example.org\",\"sattestor_onion\":\"l4yxbgn74e6ukw6zv3jojaf6bkqlgea2ny37ocry2i4xartdjkqqxwid\",\"sattestor_labels\":\"*\",\"domain\":\"satis.system33.pw\",\"onion\":\"hllvtjcjomneltczwespyle2ihuaq5hypqaavn3is6a7t2dojuaa6ryd\",\"labels\":\"news\",\"valid_after\":\"2020-04-30\",\"refreshed_on\":\"2020-05-15\"}";
 
-      let expected_tagged_token = format!("{}{}", "sattestation-token-v0", expected_unsigned_sat_tokens);
-      let expected_sig = expanded_sec_key.sign(expected_tagged_token.as_bytes(), &public_key).to_bytes();
+      let expected_tagged_cred = format!("{}{}", "sattestation-credential-v0", expected_unsigned_sat_cred);
+      let expected_sig = expanded_sec_key.sign(expected_tagged_cred.as_bytes(), &public_key).to_bytes();
 
-      assert!(public_key.verify(expected_tagged_token.as_bytes(), &Signature::from_bytes(&expected_sig).unwrap()).is_ok());
+      assert!(public_key.verify(expected_tagged_cred.as_bytes(), &Signature::from_bytes(&expected_sig).unwrap()).is_ok());
 
       let b64_sig = base64::encode(&expected_sig[..]);
-      let expected_signed_token = format!("{{sattestation:{},signature:{}}}", expected_unsigned_sat_tokens, b64_sig);
-      let expected_b64_token = base64::encode(&expected_signed_token);
+      let expected_signed_cred = format!("{{\"sattestation\":{},\"signature\":\"{}\"}}", expected_unsigned_sat_cred, b64_sig);
+      // Find signature and replace.
+      let expected_b64_cred = base64::encode(&expected_signed_cred);
 
 
-      let expected_decoded_token = base64::decode(expected_b64_token.clone()).unwrap();
-      let decoded_token = base64::decode(sat_tokens[0].clone()).unwrap();
-      assert_eq!(String::from_utf8(expected_decoded_token).unwrap(), String::from_utf8(decoded_token).unwrap());
+      let expected_decoded_cred = base64::decode(expected_b64_cred.clone()).unwrap();
+      let decoded_cred = base64::decode(one_sat_cred.clone()).unwrap();
 
-      assert_eq!(expected_b64_token, sat_tokens[0].clone());
+      let excluding_signature_prefix_len = "{".len() + "\"sattestation\":".len() + expected_unsigned_sat_cred.len() + ",".len() + "\"signature\":\"".len();
+      assert!(decoded_cred.len() > excluding_signature_prefix_len);
+
+      let decoded_cred_excluding_signature = &decoded_cred[..excluding_signature_prefix_len];
+      let expected_decoded_cred_excluding_signature = &expected_signed_cred[..excluding_signature_prefix_len];
+      let decoded_cred_encoded_signature = &decoded_cred[excluding_signature_prefix_len..(decoded_cred.len()-2)];
+      let decoded_cred_decoded_signature = base64::decode(&decoded_cred_encoded_signature.clone()).unwrap();
+
+      assert_eq!("\"}", str::from_utf8(&decoded_cred[(decoded_cred.len() - 2)..]).unwrap());
+      assert_eq!(expected_decoded_cred_excluding_signature, str::from_utf8(&decoded_cred_excluding_signature).unwrap());
+
+      // Verify the signature produced over the expected credential is valid
+      assert!(public_key.verify(expected_tagged_cred.as_bytes(), &Signature::from_bytes(&expected_sig).unwrap()).is_ok());
+      // Verify the signature produced over the test credential is valid over the expected
+      // credential
+      assert!(public_key.verify(expected_tagged_cred.as_bytes(), &Signature::from_bytes(&decoded_cred_decoded_signature).unwrap()).is_ok());
+
+      assert_eq!(String::from_utf8(expected_decoded_cred).unwrap(), String::from_utf8(decoded_cred).unwrap());
     }
 }
