@@ -650,7 +650,9 @@ fn main() {
     let mut is_sattestor = false;
     let sattestations = match read_sattestation(&sattestation_file_path.clone()) {
         Ok(s) => {
-            is_sattestor = true;
+            if s.len() > 0 {
+              is_sattestor = true;
+            }
             s
         },
         Err(e) => {
