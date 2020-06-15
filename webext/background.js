@@ -579,10 +579,10 @@ function onHeadersReceived_allowAttestedSATDomainsOnly(details) {
         return true;
     }
 
-    let b64TokenHeaders = getSatTokenHeaders(details.responseHeaders);
-    for (let b64TokenHeader of b64TokenHeaders) {
+    let b64CredentialHeaders = getSatCredentialHeaders(details.responseHeaders);
+    for (let b64CredentialHeader of b64CredentialHeaders) {
         try {
-            tokenHeaderAsBytes = window.atob(b64TokenHeader);
+            tokenHeaderAsBytes = window.atob(b64CredentialHeader);
         } catch (err) {
             log_debug("Exception in atob(): ", err);
             continue;
@@ -640,13 +640,13 @@ function onHeadersReceived_allowAttestedSATDomainsOnly(details) {
         }
 
         if (parsedContent) {
-            let expectedTokenProperties = ["sat_credential_version", "sattestor",
+            let expectedCredentialProperties = ["sat_credential_version", "sattestor",
                 "sattestor_onion", "sattestor_labels", "sattestee", "onion",
                 "labels", "valid_after", "refreshed_on"];
             let badProp = false;
-            for (let prop of expectedTokenProperties) {
+            for (let prop of expectedCredentialProperties) {
                 if (! prop in parsedContent) {
-                    log_debug(`Token missing ${prop}. Malformed.`);
+                    log_debug(`Credential missing ${prop}. Malformed.`);
                     badProp = true;
                     break;
                 }
@@ -657,12 +657,12 @@ function onHeadersReceived_allowAttestedSATDomainsOnly(details) {
             }
 
             if (parsedContent.sat_credential_version !== 1) {
-                log_debug("Token version is not 1.");
+                log_debug("Credential version is not 1.");
                 continue;
             }
 
             if (parsedContent.sattestee != url.hostname) {
-                log_debug(`Token sattestee (${parsedContent.sattestee}) is not this site.`);
+                log_debug(`Credential sattestee (${parsedContent.sattestee}) is not this site.`);
                 continue;
             }
 
@@ -680,12 +680,12 @@ function onHeadersReceived_allowAttestedSATDomainsOnly(details) {
             //// Roughly, within a few days.
 
             //if (secondValid < 0) {
-            //    log_debug(`Token valid_after (${parsedContent.valid_after}) is yet valid.`);
+            //    log_debug(`Credential valid_after (${parsedContent.valid_after}) is yet valid.`);
             //    continue;
             //}
 
             //if (validSeconds > (THREE_MONTHS + SKEW_WINDOW)) {
-            //    log_debug(`Token valid_after (${parsedContent.valid_after}) is expired.`);
+            //    log_debug(`Credential valid_after (${parsedContent.valid_after}) is expired.`);
             //    continue;
             //}
 
@@ -694,22 +694,22 @@ function onHeadersReceived_allowAttestedSATDomainsOnly(details) {
             //let timeSinceRefresh = now - refreshedOn;
 
             //if (refreshedOn < validAfter) {
-            //    log_debug(`Token refreshed_on (${parsedContent.refreshed_on}) before valid_after (${parsedContent.valid_after}).`);
+            //    log_debug(`Credential refreshed_on (${parsedContent.refreshed_on}) before valid_after (${parsedContent.valid_after}).`);
             //    continue;
             //}
 
             //if (timeSinceRefresh < 0) {
-            //    log_debug(`Token refreshed_on (${parsedContent.valid_after}) is yet valid.`);
+            //    log_debug(`Credential refreshed_on (${parsedContent.valid_after}) is yet valid.`);
             //    continue;
             //}
 
             //if (timeSinceRefresh > SKEW_WINDOW) {
-            //    log_debug(`Token valid_after (${parsedContent.valid_after}) is expired.`);
+            //    log_debug(`Credential valid_after (${parsedContent.valid_after}) is expired.`);
             //    continue;
             //}
 
             //if (timeSinceRefresh > -SKEW_WINDOW) {
-            //    log_debug(`Token valid_after (${parsedContent.valid_after}) is too far into the future.`);
+            //    log_debug(`Credential valid_after (${parsedContent.valid_after}) is too far into the future.`);
             //    continue;
             //}
 

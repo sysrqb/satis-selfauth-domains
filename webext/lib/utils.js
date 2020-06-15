@@ -342,18 +342,18 @@ function isTimelySattestation(sat) {
 
     if (msecondsValid < 0) {
         if (msecondsValid > -SKEW_WINDOW) {
-            log_debug(`Token valid_after (${sat.valid_after}) is yet valid.`);
+            log_debug(`Credential valid_after (${sat.valid_after}) is yet valid.`);
             return false;
         }
-        log_debug(`Token valid_after (${sat.valid_after}) is yet valid, but it is within the allowed clock time skew period.`);
+        log_debug(`Credential valid_after (${sat.valid_after}) is yet valid, but it is within the allowed clock time skew period.`);
     }
 
     if (msecondsValid > THREE_MONTHS) {
         if (msecondsValid > (THREE_MONTHS + SKEW_WINDOW)) {
-            log_debug(`Token with valid_after (${sat.valid_after}) is expired.`);
+            log_debug(`Credential with valid_after (${sat.valid_after}) is expired.`);
             return false;
         }
-        log_debug(`Token with valid_after (${sat.valid_after}) is expired, but it is within the allowed clock time skew period.`);
+        log_debug(`Credential with valid_after (${sat.valid_after}) is expired, but it is within the allowed clock time skew period.`);
     }
 
 
@@ -361,25 +361,25 @@ function isTimelySattestation(sat) {
     let msecondsSinceRefresh = now - refreshedOn;
 
     if (refreshedOn < validAfter) {
-        log_debug(`Token with refreshed_on (${sat.refreshed_on}) before valid_after (${sat.valid_after}).`);
+        log_debug(`Credential with refreshed_on (${sat.refreshed_on}) before valid_after (${sat.valid_after}).`);
         return false;
     }
 
     if (msecondsSinceRefresh < 0) {
         if (msecondsValid > -SKEW_WINDOW) {
-            log_debug(`Token with refreshed_on (${sat.refreshed_on}) is too far into the future.`);
+            log_debug(`Credential with refreshed_on (${sat.refreshed_on}) is too far into the future.`);
             return false;
         }
-        log_debug(`Token with refreshed_on (${sat.refreshed_on}) is too far into the future, but it is within the allowed clock time skew period.`);
+        log_debug(`Credential with refreshed_on (${sat.refreshed_on}) is too far into the future, but it is within the allowed clock time skew period.`);
     }
 
     if (msecondsSinceRefresh > SKEW_WINDOW) {
-        log_debug(`Token with refreshed_on (${sat.refreshed_on}) is expired.`);
+        log_debug(`Credential with refreshed_on (${sat.refreshed_on}) is expired.`);
         return false;
     }
 
     if (msecondsSinceRefresh < -SKEW_WINDOW) {
-        log_debug(`Token with refresh_on (${sat.refreshed_on}) is too far into the future.`);
+        log_debug(`Credential with refresh_on (${sat.refreshed_on}) is too far into the future.`);
         return false;
     }
     return true;
