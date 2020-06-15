@@ -9,6 +9,7 @@ satis_sig_bad_fp_fname="/home/satis/hs-example.com/satis_sig_bad_fp"
 satis_sig_bad_domain_fname="/home/satis/hs-example.com/satis_sig_bad_domain"
 satis_sig_bad_sig_fname="/home/satis/hs-example.com/satis_sig_bad_sig"
 satis_sig_bad_label_fname="/home/satis/hs-example.com/satis_sig_bad_label"
+sat_credential_fname="/home/satis/hs-example.com/onion.example.com_credential.json"
 htaccess_tmpl_fname="/root/satis/htaccess.tmpl"
 htaccess_out_fname="/var/www/htdocs/.htaccess"
 
