@@ -588,19 +588,24 @@ function onHeadersReceived_allowAttestedSATDomainsOnly(details) {
             continue;
         }
         let lightlyParsed = lightlyParseSatJSON(tokenHeaderAsBytes);
-        let taggedUnparsedContent = "sattestation-list-v0" + lightlyParsed.unparsedContent;
+        let taggedUnparsedContent = "sattestation-credential-v0" + lightlyParsed.unparsedContent;
+
+        if (! "sig" in lightlyParsed) {
+            log_debug("Credential does not contain sig");
+            continue;
+        }
 
         let sigDecode = "";
         try {
           sigDecode = window.atob(lightlyParsed.sig);
         } catch (err) {
           log_debug("Exception in atob(): ", err);
-          return;
+          continue;
         }
 
         if (sigDecode.length !== 64) {
           log_debug(`Signature is an incorrect length: ${sigDecode.length}`);
-          return;
+          continue;
         }
 
         // Binary string to array of u8
@@ -635,9 +640,9 @@ function onHeadersReceived_allowAttestedSATDomainsOnly(details) {
         }
 
         if (parsedContent) {
-            let expectedTokenProperties = ["sat_list_version", "sattestor",
-                "sattestor_onion", "sattestor_labels", "sattestee", "sattestee_onion",
-                "sattestee_labels", "valid_after"];
+            let expectedTokenProperties = ["sat_credential_version", "sattestor",
+                "sattestor_onion", "sattestor_labels", "sattestee", "onion",
+                "labels", "valid_after", "refreshed_on"];
             let badProp = false;
             for (let prop of expectedTokenProperties) {
                 if (! prop in parsedContent) {
@@ -651,7 +656,7 @@ function onHeadersReceived_allowAttestedSATDomainsOnly(details) {
                 continue;
             }
 
-            if (parsedContent.sat_list_version !== 1) {
+            if (parsedContent.sat_credential_version !== 1) {
                 log_debug("Token version is not 1.");
                 continue;
             }
@@ -661,20 +666,52 @@ function onHeadersReceived_allowAttestedSATDomainsOnly(details) {
                 continue;
             }
 
-            let validAfter = Date.parse(parsedContent.valid_after);
-            let secondsValid = Date.now() - validAfter;
-            // Roughly, within a few days.
-            let threeMonths = 60*60*24*30*3;
-
-            if (secondValid < 0) {
-                log_debug(`Token valid_after (${parsedContent.valid_after}) is yet valid.`);
+            if (!isSattestationGood(parsedContent)) {
                 continue;
             }
 
-            if (validSeconds > threeMonths) {
-                log_debug(`Token valid_after (${parsedContent.valid_after}) is expired.`);
-                continue;
-            }
+            //const SKEW_WINDOW = 60*60*24*3.5;
+            //const THREE_MONTHS = 60*60*24*30*3;
+            //const SEVEN_DAYS = 60*60*24*7;
+
+            //let now = Date.now() / 1000;
+            //let validAfter = Date.parse(parsedContent.valid_after);
+            //let secondsValid = now - validAfter;
+            //// Roughly, within a few days.
+
+            //if (secondValid < 0) {
+            //    log_debug(`Token valid_after (${parsedContent.valid_after}) is yet valid.`);
+            //    continue;
+            //}
+
+            //if (validSeconds > (THREE_MONTHS + SKEW_WINDOW)) {
+            //    log_debug(`Token valid_after (${parsedContent.valid_after}) is expired.`);
+            //    continue;
+            //}
+
+
+            //let refreshedOn = Date.parse(parsedContent.refreshed_on);
+            //let timeSinceRefresh = now - refreshedOn;
+
+            //if (refreshedOn < validAfter) {
+            //    log_debug(`Token refreshed_on (${parsedContent.refreshed_on}) before valid_after (${parsedContent.valid_after}).`);
+            //    continue;
+            //}
+
+            //if (timeSinceRefresh < 0) {
+            //    log_debug(`Token refreshed_on (${parsedContent.valid_after}) is yet valid.`);
+            //    continue;
+            //}
+
+            //if (timeSinceRefresh > SKEW_WINDOW) {
+            //    log_debug(`Token valid_after (${parsedContent.valid_after}) is expired.`);
+            //    continue;
+            //}
+
+            //if (timeSinceRefresh > -SKEW_WINDOW) {
+            //    log_debug(`Token valid_after (${parsedContent.valid_after}) is too far into the future.`);
+            //    continue;
+            //}
 
             log_debug("Provided token is valid");
             return true;
@@ -1075,6 +1112,12 @@ async function onMessage_validateParseSattestation(msg) {
     let parsed = validateAndParseSattestation(msg);
     if (!parsed) {
         return;
+    }
+    for (let sat of parsed.sattestees) {
+        if (!isTimelySattestation(sat)) {
+            log_debug(`Sattestation has an invalid entry. Ignoring entire list.`);
+            return;
+        }
     }
     let satSet = handleSattestations(parsed);
     if (!satSet) {

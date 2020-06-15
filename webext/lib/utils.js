@@ -132,6 +132,10 @@ function findSATDomainList(doc) {
 }
 
 function handleSattestations(sat) {
+    if (! "sat_list_version" in sat) {
+        log_debug("msg does not contain sattestor");
+        return;
+    }
     if (! "sattestor_domain" in sat) {
         log_debug("msg does not contain sattestor");
         return;
@@ -150,6 +154,11 @@ function handleSattestations(sat) {
     }
     if (! "isSatUrl" in sat) {
         log_debug("msg does not contain isSatUrl");
+        return;
+    }
+
+    if (sat.sat_list_version !== 1) {
+        log_debug("Sattestation version is not 1.");
         return;
     }
 
@@ -190,8 +199,13 @@ function handleSattestations(sat) {
             for (let sattestee_label of labels) {
                 let found = 0;
                 for (let sattestor_label of sattestor_labels) {
+                    if ("*" === sattestor_label) {
+                        found = 1;
+                        break;
+                    }
                     if (sattestee_label == sattestor_label) {
                         found = 1;
+                        break;
                     }
                 }
                 if (!found) {
@@ -316,6 +330,62 @@ function findSATSigInMetaTag(doc) {
     return;
 }
 
+function isTimelySattestation(sat) {
+    // 3.5 days (milliseconds)
+    const SKEW_WINDOW = 1000*60*60*24*3.5;
+    // Roughly three months, within a few days.
+    const THREE_MONTHS = 1000*60*60*24*30*3;
+
+    let now = Date.now();
+    let validAfter = Date.parse(sat.valid_after);
+    let msecondsValid = now - validAfter;
+
+    if (msecondsValid < 0) {
+        if (msecondsValid > -SKEW_WINDOW) {
+            log_debug(`Token valid_after (${sat.valid_after}) is yet valid.`);
+            return false;
+        }
+        log_debug(`Token valid_after (${sat.valid_after}) is yet valid, but it is within the allowed clock time skew period.`);
+    }
+
+    if (msecondsValid > THREE_MONTHS) {
+        if (msecondsValid > (THREE_MONTHS + SKEW_WINDOW)) {
+            log_debug(`Token with valid_after (${sat.valid_after}) is expired.`);
+            return false;
+        }
+        log_debug(`Token with valid_after (${sat.valid_after}) is expired, but it is within the allowed clock time skew period.`);
+    }
+
+
+    let refreshedOn = Date.parse(sat.refreshed_on);
+    let msecondsSinceRefresh = now - refreshedOn;
+
+    if (refreshedOn < validAfter) {
+        log_debug(`Token with refreshed_on (${sat.refreshed_on}) before valid_after (${sat.valid_after}).`);
+        return false;
+    }
+
+    if (msecondsSinceRefresh < 0) {
+        if (msecondsValid > -SKEW_WINDOW) {
+            log_debug(`Token with refreshed_on (${sat.refreshed_on}) is too far into the future.`);
+            return false;
+        }
+        log_debug(`Token with refreshed_on (${sat.refreshed_on}) is too far into the future, but it is within the allowed clock time skew period.`);
+    }
+
+    if (msecondsSinceRefresh > SKEW_WINDOW) {
+        log_debug(`Token with refreshed_on (${sat.refreshed_on}) is expired.`);
+        return false;
+    }
+
+    if (msecondsSinceRefresh < -SKEW_WINDOW) {
+        log_debug(`Token with refresh_on (${sat.refreshed_on}) is too far into the future.`);
+        return false;
+    }
+    return true;
+}
+
+
 function validateAndParseSattestation(msg) {
     if (! "response" in msg) {
         log_debug("msg does not contain unparsedContent");
@@ -335,14 +405,9 @@ function validateAndParseSattestation(msg) {
     if (!log_assert(nacl != null, "NaCl wasn't initialized in time")) {
         return;
     }
-    let details = secInfoCache[msg.url];
-    if (!details) {
-        log_debug("Cached SecInfo not found");
-        return;
-    }
-    let url = splitURL(msg.url);
 
     let isSatUrl = true;
+    let url = splitURL(msg.url);
     let onion = onion_v3extractFromPossibleSATUrl(url);
     if (!onion) {
         log_debug(`Self-authenticating url not found in ${url}`);
