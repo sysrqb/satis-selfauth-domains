@@ -375,10 +375,13 @@ fn make_sat_list(expanded_sec_key: &ExpandedSecretKey, public_key: &PublicKey, h
 fn make_sat_credential(expanded_sec_key: &ExpandedSecretKey, public_key: &PublicKey, hostname: &str, onionaddr: &str, sattestations: &str, sattestor_labels: &str) -> HashMap<String, String> {
   let mut credentials = HashMap::new();
   for s in sattestations.split(";") {
-    let sattestee: Vec<&str> = s.split(":").collect();
+    let mut sattestee: Vec<&str> = s.split(":").collect();
     if sattestee.len() != 5 {
       println!("Invalid sattestation format: '{}'", s);
       continue;
+    }
+    if sattestee[0].starts_with("-") {
+      sattestee[0] = &sattestee[0][1..];
     }
     let mut unsigned_credential = String::new();
     let mut signed_credential = String::new();
