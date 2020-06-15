@@ -320,6 +320,9 @@ fn construct_pretty_sat_object(hostname: &str, onionaddr: &str, sattestations: &
     if sattestee.len() != 5 {
       continue;
     }
+    if sattestee[0].starts_with("-") {
+      continue;
+    }
     let mut sat = String::new();
     sat.push_str(&format!("{}{{\n", brace_indent));
     sat.push_str(&print_sat_token_content(&content_indent, &sattestee));
