@@ -481,12 +481,17 @@ async function onHeadersReceived_verifySelfAuthConnection(details) {
 
     // attestedSat is:
     //   undefined if this connection should not consider sattestation
-    //   true if it is sattested
+    //   true if it is sattested by a sattestation list
+    //   Sattestor Object with a "satName" property if it is sattested by credential
     //   Object with a 'redirectUrl' property if it failed validation
-    if (attestedSat && attestedSat === true) {
+    if (attestedSat && ((attestedSat === true) || ("id" in attestedSat))) {
         if (sigHeader.isV1) {
             let lists = satListsContaining(hostname);
-            if (!lists) {
+            if (attestedSat !== true && "id" in attestedSat) {
+                let hash = attestedSat.id;
+                lists[hash] = attestedSat;
+            }
+            if (Object.keys(lists).length === 0) {
                 err = "Null sattestors list";
             }
 
@@ -588,13 +593,18 @@ function onHeadersReceived_allowAttestedSATDomainsOnly(details) {
             continue;
         }
         let lightlyParsed = lightlyParseSatJSON(tokenHeaderAsBytes);
-        let taggedUnparsedContent = "sattestation-credential-v0" + lightlyParsed.unparsedContent;
 
         if (! "sig" in lightlyParsed) {
             log_debug("Credential does not contain sig");
             continue;
         }
 
+        if (! "unparsedContent" in lightlyParsed) {
+            log_debug("Credential does not contain unparsedContent");
+            continue;
+        }
+
+        let taggedUnparsedContent = "sattestation-credential-v0" + lightlyParsed.unparsedContent;
         let sigDecode = "";
         try {
           sigDecode = window.atob(lightlyParsed.sig);
@@ -613,26 +623,28 @@ function onHeadersReceived_allowAttestedSATDomainsOnly(details) {
         let contentAsBytes = byteStringToUint8Array(taggedUnparsedContent);
 
         let parsedContent;
+        let sattestor;
         let trustedSatList = getTrustedSatLists();
         for (let sat in trustedSatList) {
-            log_debug(`Validating credential using ${sat.name}`);
-            if (sat.list.length === 0) {
+            log_debug(`Validating credential using ${trustedSatList[sat].name}`);
+            if (trustedSatList[sat].list.length === 0) {
                 continue;
             }
-            let satName = sat.list[0].satName;
+            let satName = trustedSatList[sat].list[0].satName;
             let o = onion_v3extractFromPossibleSATDomain(satName);
             if (!o) {
                 log_debug(`${satName} is not a sata`);
                 continue;
             }
             let onion = new Onion(o);
-            if (!o) {
+            if (!onion) {
                 log_debug(`${satName} does not start with a valid onion address`);
                 continue;
             }
-            parsedContent = validateAndParseJson(contentAsBytes, taggedUnparsedContent, sigAsBytes, onion);
+            parsedContent = validateAndParseJson(lightlyParsed.unparsedContent, contentAsBytes, sigAsBytes, onion);
             if (parsedContent) {
                 log_debug(`${satName} validates credential`);
+                sattestor = trustedSatList[sat];
                 break;
             }
 
@@ -640,12 +652,12 @@ function onHeadersReceived_allowAttestedSATDomainsOnly(details) {
         }
 
         if (parsedContent) {
-            let expectedCredentialProperties = ["sat_credential_version", "sattestor",
-                "sattestor_onion", "sattestor_labels", "sattestee", "onion",
+            let expectedCredentialProperties = ["sat_credential_version", "sattestor_domain",
+                "sattestor_onion", "sattestor_labels", "domain", "onion",
                 "labels", "valid_after", "refreshed_on"];
             let badProp = false;
             for (let prop of expectedCredentialProperties) {
-                if (! prop in parsedContent) {
+                if (!(prop in parsedContent)) {
                     log_debug(`Credential missing ${prop}. Malformed.`);
                     badProp = true;
                     break;
@@ -661,14 +673,41 @@ function onHeadersReceived_allowAttestedSATDomainsOnly(details) {
                 continue;
             }
 
-            if (parsedContent.sattestee != url.hostname) {
+            if (parsedContent.domain != url.hostname) {
                 log_debug(`Credential sattestee (${parsedContent.sattestee}) is not this site.`);
                 continue;
             }
 
-            if (!isSattestationGood(parsedContent)) {
+            if (!isTimelySattestation(parsedContent)) {
                 continue;
             }
+
+            // Split the labels
+            parsedContent.sattestor_labels = parsedContent.sattestor_labels.split(",");
+            parsedContent.labels = parsedContent.labels.split(",");
+
+            // The sattestor is always at index 0
+            let sattestorSat = sattestor.list[0];
+            if (parsedContent.sattestor_labels.length !== sattestorSat.labels.length) {
+                log_debug(`Credential labels (${parsedContent.labels}) is not the expected length.`);
+                continue;
+            }
+
+            let allTrustedLabels = true;
+            for (let label of parsedContent.labels) {
+                if (!(sattestorSat.labels.includes(label))) {
+                    log_debug(`Credential label (${label}) is trusted for sattestor.`);
+                    allTrustedLabels = false;
+                    break;
+                }
+            }
+
+            if (!allTrustedLabels) {
+                continue;
+            }
+
+            // Fix-up sattestor so it includes this sattestee
+            sattestor.list = [sattestor.list[0], {'satName': parsedContent.onion + "onion." + parsedContent.domain, 'baseName': parsedContent.domain, 'labels': parsedContent.labels}];
 
             //const SKEW_WINDOW = 60*60*24*3.5;
             //const THREE_MONTHS = 60*60*24*30*3;
@@ -714,7 +753,7 @@ function onHeadersReceived_allowAttestedSATDomainsOnly(details) {
             //}
 
             log_debug("Provided token is valid");
-            return true;
+            return sattestor;
         }
     }
 
