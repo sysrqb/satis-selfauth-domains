@@ -54,6 +54,8 @@ b64_sig_bad_fp="$(get_current_sig  "$satis_sig_bad_fp_fname")"
 b64_sig_bad_domain="$(get_current_sig  "$satis_sig_bad_domain_fname")"
 b64_sig_bad_sig="$(get_current_sig  "$satis_sig_bad_sig_fname")"
 b64_sig_bad_label="$(get_current_sig  "$satis_sig_bad_label_fname")"
+b64_sat_credential="$(test -f "$sat_credential_fname" && cat "$sat_credential_fname")"
+b64_sat_credential_enabled=$(test -n "$sat_credential" && echo 1) || 0
 generation_date=`date`
 m4 \
 	-DM4_SATIS_SIG="$b64_sig" \
@@ -63,6 +65,8 @@ m4 \
 	-DM4_SATIS_SIG_BAD_SIG="$b64_sig_bad_sig" \
 	-DM4_SATIS_SIG_BAD_LABEL="$b64_sig_bad_label" \
 	-DM4_SATIS_GENERATION_DATE="$generation_date" \
+	-DM4_SAT_CREDENTIAL="$b64_sat_credential" \
+	-DM4_SAT_CREDENTIAL_ENABLED="$b64_sat_credential_enabled" \
 	"$htaccess_tmpl_fname" > "$htaccess_out_fname"
 
 # Comment 'Generated on' line
