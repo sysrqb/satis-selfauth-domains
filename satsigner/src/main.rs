@@ -294,9 +294,9 @@ fn construct_sat_token(sattestee: &Vec<&str>) -> Result<String, IoError> {
 }
 
 
-fn construct_sat_token_header(hostname: &str, onionaddr: &str, sattestor_labels: &str, indentation: &str, new_line: &str) -> String {
+fn construct_sat_token_header(hostname: &str, onionaddr: &str, sat_type: &str, sattestor_labels: &str, indentation: &str, new_line: &str) -> String {
   let mut header = String::new();
-  write!(&mut header, "{}\"sat_list_version\":\"1\",{}", indentation, new_line)
+  write!(&mut header, "{}\"sat_{}_version\":1,{}", indentation, sat_type, new_line)
       .expect("Writing header failed");
   write!(&mut header, "{}\"sattestor_domain\":\"{}\",{}", indentation, hostname, new_line)
       .expect("Writing header failed");
@@ -352,7 +352,7 @@ fn construct_pretty_sat_object(hostname: &str, onionaddr: &str, sattestations: &
 " {{
 {}    \"sattestees\": {}
   }}",
-  construct_sat_token_header(hostname, onionaddr, sattestor_labels, "    ", "\n"),
+  construct_sat_token_header(hostname, onionaddr, "list", sattestor_labels, "    ", "\n"),
   sat).to_string();
   r
 }
@@ -379,7 +379,7 @@ fn make_sat_credential(expanded_sec_key: &ExpandedSecretKey, public_key: &Public
     }
     let mut unsigned_credential = String::new();
     let mut signed_credential = String::new();
-    let header = construct_sat_token_header(hostname, onionaddr, sattestor_labels, "", "");
+    let header = construct_sat_token_header(hostname, onionaddr, "credential", sattestor_labels, "", "");
     let credential = construct_sat_token(&sattestee).unwrap();
     write!(unsigned_credential, "{{{}{}}}", header, credential).expect("Writing unsigned credential failed");
 
@@ -729,8 +729,8 @@ mod tests {
  \"refreshed_on\": \"2020-05-15\"\n";
       assert_eq!(expected_token_content, sat_token_content);
 
-      let sat_token_header = construct_sat_token_header(hostname, onionaddr, "*", " ", "\n");
-      let expected_token_header = " \"sat_list_version\":\"1\",
+      let sat_token_header = construct_sat_token_header(hostname, onionaddr, "list", "*", " ", "\n");
+      let expected_token_header = " \"sat_list_version\":1,
  \"sattestor_domain\":\"sata.example.org\",
  \"sattestor_onion\":\"l4yxbgn74e6ukw6zv3jojaf6bkqlgea2ny37ocry2i4xartdjkqqxwid\",
  \"sattestor_labels\":\"*\",\n";
@@ -738,7 +738,7 @@ mod tests {
 
       let msg = construct_pretty_sat_object(&hostname, &onionaddr, &sattestations, "*");
       let expected_sat_object = format!(" {{
-    \"sat_list_version\":\"1\",
+    \"sat_list_version\":1,
     \"sattestor_domain\":\"{}\",
     \"sattestor_onion\":\"{}\",
     \"sattestor_labels\":\"*\",
@@ -806,7 +806,7 @@ mod tests {
       assert!(sat_creds.len() > 0);
       let one_sat_cred = sat_creds.get(&"hllvtjcjomneltczwespyle2ihuaq5hypqaavn3is6a7t2dojuaa6rydonion.satis.system33.pw".to_string()).unwrap();
         
-      let expected_unsigned_sat_cred = "{\"sat_list_version\":\"1\",\"sattestor_domain\":\"sata.example.org\",\"sattestor_onion\":\"l4yxbgn74e6ukw6zv3jojaf6bkqlgea2ny37ocry2i4xartdjkqqxwid\",\"sattestor_labels\":\"*\",\"domain\":\"satis.system33.pw\",\"onion\":\"hllvtjcjomneltczwespyle2ihuaq5hypqaavn3is6a7t2dojuaa6ryd\",\"labels\":\"news\",\"valid_after\":\"2020-04-30\",\"refreshed_on\":\"2020-05-15\"}";
+      let expected_unsigned_sat_cred = "{\"sat_credential_version\":1,\"sattestor_domain\":\"sata.example.org\",\"sattestor_onion\":\"l4yxbgn74e6ukw6zv3jojaf6bkqlgea2ny37ocry2i4xartdjkqqxwid\",\"sattestor_labels\":\"*\",\"domain\":\"satis.system33.pw\",\"onion\":\"hllvtjcjomneltczwespyle2ihuaq5hypqaavn3is6a7t2dojuaa6ryd\",\"labels\":\"news\",\"valid_after\":\"2020-04-30\",\"refreshed_on\":\"2020-05-15\"}";
 
       let expected_tagged_cred = format!("{}{}", "sattestation-credential-v0", expected_unsigned_sat_cred);
       let expected_sig = expanded_sec_key.sign(expected_tagged_cred.as_bytes(), &public_key).to_bytes();
