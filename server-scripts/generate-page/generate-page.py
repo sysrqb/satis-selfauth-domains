@@ -87,6 +87,8 @@ def output_html(fd, pre_text, post_text, mapping):
     fd.write(pre_text)
     for trad_name in mapping:
         for selfauth_name in mapping[trad_name]:
+            if selfauth_name.startswith("-"):
+                selfauth_name = selfauth_name[1:]
             fd.write(
                 ITEM_HTML.format(sat_name=selfauth_name, trad_name=trad_name))
     fd.write(post_text)
