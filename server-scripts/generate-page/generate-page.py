@@ -120,7 +120,7 @@ if __name__ == '__main__':
             formatter_class=ArgumentDefaultsHelpFormatter)
     p.add_argument('-c', '--config', type=str, default='config.ini')
     p.add_argument('-o', '--output', type=str, default='/dev/stdout')
-    p.add_argument('-s', '--sattestation', type=str, default='sattestation.csv')
+    p.add_argument('-s', '--sattestation', type=str, default='sattestation.csv.tmpl')
     args = p.parse_args()
     conf = get_config(args)
     exit(main(args, conf))
