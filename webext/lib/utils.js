@@ -292,20 +292,33 @@ function lightlyParseSatJSON(content) {
     }
     sig = sig.substring(1, sig.length - 1);
 
-    let unparsedSat = satArr[1].substring(0, startOfSigObject - satIdx - 1);
+    // Obtain the signed-message portion of the sattestation. satIdx is the
+    // offset within trimmedContent and it corrects startOfSigObject within
+    // satArr[1].
+    let unparsedSat = satArr[1].substring(0, startOfSigObject - satIdx);
     if (unparsedSat === 0) {
         log_debug("There is no sattestation in this document.");
         return;
     }
+    let trimmedUnparsedSat = unparsedSat.trim();
 
-    let lastComma = unparsedSat.lastIndexOf(',');
+    let lastComma = trimmedUnparsedSat.lastIndexOf(',');
     if (lastComma === -1) {
         log_debug("Last comma (before sig) not found.");
         return;
     }
-    unparsedSat = unparsedSat.substring(0, lastComma);
 
-    return {'sig': sig, 'unparsedContent': unparsedSat};
+    if (lastComma === (trimmedUnparsedSat.length-1)) {
+        trimmedUnparsedSat = trimmedUnparsedSat.substring(0, lastComma);
+        trimmedUnparsedSat = trimmedUnparsedSat.trim();
+        let lastChar = trimmedUnparsedSat[trimmedUnparsedSat.length - 1];
+        if (lastChar !== "}") {
+            log_debug(`Sattestion does not end with '}' (${lastChar}).`);
+            return;
+        }
+    }
+
+    return {'sig': sig, 'unparsedContent': trimmedUnparsedSat};
 }
 
 function findSATSigInMetaTag(doc) {
