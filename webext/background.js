@@ -482,7 +482,7 @@ async function onHeadersReceived_verifySelfAuthConnection(details) {
     // attestedSat is:
     //   undefined if this connection should not consider sattestation
     //   true if it is sattested by a sattestation list
-    //   Sattestor Object with a "satName" property if it is sattested by credential
+    //   Sattestor Object with a "id" property if it is sattested by credential
     //   Object with a 'redirectUrl' property if it failed validation
     if (attestedSat && ((attestedSat === true) || ("id" in attestedSat))) {
         if (sigHeader.isV1) {
@@ -501,7 +501,7 @@ async function onHeadersReceived_verifySelfAuthConnection(details) {
             for (let sattestor in lists) {
                 let sattestees = lists[sattestor].list;
                 for (let sattestee of sattestees) {
-                    if (sattestee.satName != hostname || !sattestee.labels) {
+                    if (sattestee.satName !== hostname || !sattestee.labels) {
                         continue;
                     }
                     // Skip duplicates
@@ -513,6 +513,7 @@ async function onHeadersReceived_verifySelfAuthConnection(details) {
                     }
                 }
             }
+
             let foundMatch = false;
             for (let label of selfLabels) {
                 if (label === "*") {
@@ -673,8 +674,9 @@ function onHeadersReceived_allowAttestedSATDomainsOnly(details) {
                 continue;
             }
 
-            if (parsedContent.domain != url.hostname) {
-                log_debug(`Credential sattestee (${parsedContent.sattestee}) is not this site.`);
+            let baseDomain = onion_extractBaseDomain(url.hostname) || url.hostname;
+            if (parsedContent.domain !== baseDomain) {
+                log_debug(`Credential domain (${parsedContent.domain}) is not this site.`);
                 continue;
             }
 
@@ -913,7 +915,7 @@ function onMessage_satDomainList(obj) {
             log_debug("Ignoring", satName, "bc it isn't a SAT domain (1)");
             continue;
         }
-        o = onion = new Onion(o);
+        o = new Onion(o);
         if (!o) {
             log_debug("Ignoring", satName, "bc it isn't a SAT domain (2)");
             continue;
@@ -934,8 +936,9 @@ function onMessage_satDomainList(obj) {
         updateUrl = updateUrl + "/.well-known/sattestation.json";
     }
     if (satUrl) {
-        updateUrl = updateUrl + "?onion=" + onion.str;
+        updateUrl = onion_extractBaseDomain(updateUrl) + "?onion=" + onion.str;
     }
+    updateUrl = url.protocol + "//" + updateUrl;
     let hash = sha3_256.create().update(updateUrl).hex();
     if (!(hash in trustedSATLists)) {
         log_debug("Adding", hostname, "to trusted SAT lists");
