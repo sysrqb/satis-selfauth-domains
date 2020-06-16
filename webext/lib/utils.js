@@ -195,27 +195,33 @@ function handleSattestations(sat) {
             }
             let labels = sattestee.labels.split(",");
 
-            let badLabel = false;
-            for (let sattestee_label of labels) {
-                let found = 0;
-                for (let sattestor_label of sattestor_labels) {
-                    if ("*" === sattestor_label) {
-                        found = 1;
-                        break;
+            // Sattestor may be trusted for any sattestation of this sattestee
+            let sattestorLabel = `sattestor(${sattestee.domain})`;
+            if (!sattestor_labels.includes(sattestorLabel)) {
+                // If the sattestor is not trusted for any sattestation,
+                // then compare contextual labels
+                let badLabel = false;
+                for (let sattestee_label of labels) {
+                    let found = 0;
+                    for (let sattestor_label of sattestor_labels) {
+                        if ("*" === sattestor_label) {
+                            found = 1;
+                            break;
+                        }
+                        if (sattestee_label === sattestor_label) {
+                            found = 1;
+                            break;
+                        }
                     }
-                    if (sattestee_label == sattestor_label) {
-                        found = 1;
+                    if (!found) {
+                        log_debug(`${satName} not trusted for label ${sattestee_label}. Skipping.`);
+                        badLabel = true;
                         break;
                     }
                 }
-                if (!found) {
-                    log_debug(`${satName} not trusted for label ${sattestee_label}. Skipping.`);
-                    badLabel = true;
-                    break;
+                if (badLabel) {
+                    continue;
                 }
-            }
-            if (badLabel) {
-                continue;
             }
             // TODO Add labels and valid_after
             out.add({'satName': sattestee.onion + "onion." + sattestee.domain, 'baseName': sattestee.domain, 'labels': labels});

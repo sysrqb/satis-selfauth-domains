@@ -693,21 +693,26 @@ function onHeadersReceived_allowAttestedSATDomainsOnly(details) {
                 continue;
             }
 
-            let allTrustedLabels = true;
-            for (let label of parsedContent.labels) {
-                if (!(sattestorSat.labels.includes(label))) {
-                    log_debug(`Credential label (${label}) is trusted for sattestor.`);
-                    allTrustedLabels = false;
-                    break;
+            // Sattestor may be trusted for any sattestation of this sattestee
+            let sattestorLabel = `sattestor(${parsedContent.domain})`;
+            if (!sattestorSat.labels.includes(sattestorLabel) && !sattestorSat.labels.includes("*")) {
+                // Else, compare all self-labels against sattestor
+                let allTrustedLabels = true;
+                for (let label of parsedContent.labels) {
+                    if (!(sattestorSat.labels.includes(label))) {
+                        log_debug(`Credential label (${label}) is trusted for sattestor.`);
+                        allTrustedLabels = false;
+                        break;
+                    }
+                }
+
+                if (!allTrustedLabels) {
+                    continue;
                 }
             }
 
-            if (!allTrustedLabels) {
-                continue;
-            }
-
             // Fix-up sattestor so it includes this sattestee
-            sattestor.list = [sattestor.list[0], {'satName': parsedContent.onion + "onion." + parsedContent.domain, 'baseName': parsedContent.domain, 'labels': parsedContent.labels}];
+            sattestor.list = [sattestor.list[0], {'satName': `${parsedContent.onion}onion.${parsedContent.domain}`, 'baseName': parsedContent.domain, 'labels': parsedContent.labels}];
 
             //const SKEW_WINDOW = 60*60*24*3.5;
             //const THREE_MONTHS = 60*60*24*30*3;
