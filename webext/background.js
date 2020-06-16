@@ -822,11 +822,15 @@ function onBeforeRequest_cacheOnionAddressConnection(details) {
         try {
             let url = splitURL(details.url);
 
-            let onion = onion_v3extractFromPossibleSATDomain(url.hostname);
+            let onion = onion_v3extractFromPossibleSATUrl(url);
             if (!onion) {
-                log_debug("Stopped considering", url.hostname, "because not",
-                    "a self-authenticating domain name");
-                resolve({"cancel": false});
+                log_debug(`Self-authenticating url not found in ${url}`);
+                onion = onion_v3extractFromPossibleSATDomain(url.hostname);
+                if (!onion) {
+                    log_debug("Stopped considering", url.hostname, "because not",
+                        "a self-authenticating domain name");
+                    resolve({"cancel": false});
+                }
             } else if (`${onion}.onion` == onion_extractBaseDomain(url.hostname)) {
                 log_debug("Stopped considering", url.hostname, "because not",
                     "a self-authenticating domain name - it's a raw onion address");
