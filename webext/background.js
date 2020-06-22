@@ -696,7 +696,7 @@ function onHeadersReceived_allowAttestedSATDomainsOnly(details) {
             }
 
             // Sattestor may be trusted for any sattestation of this sattestee
-            let sattestorLabel = `sattestor(${parsedContent.domain})`;
+            let sattestorLabel = `sattestor(${parsedContent.onion}onion.${parsedContent.domain})`;
             if (!sattestorSat.labels.includes(sattestorLabel) && !sattestorSat.labels.includes("*")) {
                 // Else, compare all self-labels against sattestor
                 let allTrustedLabels = true;

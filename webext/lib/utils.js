@@ -196,7 +196,7 @@ function handleSattestations(sat) {
             let labels = sattestee.labels.split(",");
 
             // Sattestor may be trusted for any sattestation of this sattestee
-            let sattestorLabel = `sattestor(${sattestee.domain})`;
+            let sattestorLabel = `sattestor(${sattestee.onion}onion.${sattestee.domain})`;
             if (!sattestor_labels.includes(sattestorLabel)) {
                 // If the sattestor is not trusted for any sattestation,
                 // then compare contextual labels
