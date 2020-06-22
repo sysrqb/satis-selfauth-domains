@@ -842,7 +842,7 @@ function onBeforeRequest_cacheOnionAddressConnection(details) {
                 //    log_debug("We're looping.");
                 //    resolve({"cancel": true});
                 //}
-                fetch("https://www.sysrqb.xyz", {method: 'GET', credentials: 'omit'})
+                fetch("https://www.selfauth.site", {method: 'GET', credentials: 'omit'})
                   .then((response) => {
                     if (response.ok) {
                       console.log(`Successful response from ${onion}`);

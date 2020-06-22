@@ -1,12 +1,12 @@
 {
     "manifest_version": 2,
-    "name": "SAT Domain Tools",
-    "version": "1.3.2",
-    "description": "Self-authenticating Traditional domains weave self-authentication into the web",
+    "name": "SAT Address Tools",
+    "version": "2.0.0",
+    "description": "Self-authenticating Traditional addresses weave self-authentication into the web",
     "browser_specific_settings": {
         "gecko": {
             "strict_min_version": "63.0",
-            "update_url": "https://demos.traudt.xyz/extensions/firefox/sat_domain_tools/updates.json"
+            "update_url": "https://www.selfauthdomain.info/extensions/firefox/sat_domain_tools/updates.json"
         }
     },
     "icons": {
@@ -21,7 +21,7 @@
     "browser_action": {
         "browser_style": true,
         "default_icon": "icons/onion-48.png",
-        "default_title": "SAT Domain Tools",
+        "default_title": "SAT Domain Tools (v2)",
         "default_popup": "popup/index.html"
     },
     "background": {
