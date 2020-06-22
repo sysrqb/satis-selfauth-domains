@@ -15,6 +15,8 @@ ITEM_HTML = '''
   <li><a href='https://{sat_name}'>{sat_name}</a> -> <a href='https://{trad_name}'>{trad_name}</a></li>
 '''
 
+CREDENTIAL_TEXT = "<p>A sattestation credential is available for this site at <a href='{url}'>{domain}</a>"
+
 def parse_domain_list_fd(fd):
     out = {}
     sattestations={}
@@ -115,9 +117,17 @@ def main(args, conf):
     origin = conf.get('site', 'origin')
     onion = conf.get('site', 'onion')
     sattestora_origin = conf.get('site', 'sattestora_origin')
+    sattestora_onion = conf.get('site', 'sattestora_onion')
     sattestorb_origin = conf.get('site', 'sattestorb_origin')
-    formated_pre = pre_text.format(onion=onion, origin=origin, sattestora_origin=sattestora_origin, sattestorb_origin=sattestorb_origin)
+    sattestorb_onion = conf.get('site', 'sattestorb_onion')
+    origin_credential = conf.get('site', 'sattestor_origin_credential')
+    onion_credential = conf.get('site', 'sattestor_onion_credential')
+    credential=None
+    if origin_credential:
+        url="https://{domain}/.well-known/{onion}onion.{origin}_credential.json?onion={sattestor_onion}".format(domain=origin_credential, onion=onion, origin=origin, sattestor_onion=onion_credential)
+        credential=CREDENTIAL_TEXT.format(url=url, domain=origin_credential)
     formated_post = post_text.format(onion=onion, origin=origin, sattestora_origin=sattestora_origin, sattestorb_origin=sattestorb_origin)
+    formated_pre = pre_text.format(onion=onion, origin=origin, sattestora_origin=sattestora_origin, sattestorb_origin=sattestorb_origin, credential_url=credential)
     output_html(open(args.output, 'wt'), formated_pre, formated_post, mapping)
     output_sattestation(open(args.sattestation, 'wt'), sattestations)
     return 0
