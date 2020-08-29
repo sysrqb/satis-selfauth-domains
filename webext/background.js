@@ -4,7 +4,7 @@ var try_fetch = true;
 var secInfoCache = {}
 var waitingForMetaTag = {}
 
-const SAT_LIST_UPDATE_INTERVAL = 3600; // seconds
+const MAX_SAT_REFRESH_INTERVAL = 5*24*60*60; // seconds
 const PERSONAL_LIST_HASH = sha3_256.create().update("personal").hex();
 
 function getTrustedSatLists() {
@@ -878,6 +878,7 @@ function onMessage_satDomainList(obj) {
     let wellknown = obj.wellknown;
     let satUrl = obj.satUrl;
     let hostname = url.hostname;
+    let refreshRate = obj.refreshRate;
     log_debug("Found set of SAT domain mappings from", url.hostname);
 
     // Make sure we are visiting a SAT domain
@@ -946,11 +947,12 @@ function onMessage_satDomainList(obj) {
     let hash = sha3_256.create().update(updateUrl).hex();
     if (!(hash in trustedSATLists)) {
         log_debug("Adding", hostname, "to trusted SAT lists");
+        let refreshInSecs = Math.min(MAX_SAT_REFRESH_INTERVAL, refreshRate*24*60*60)
         trustedSATLists[hash] = new SATList(
             updateUrl, list, false, false, false, null,
-            hostname, wellknown, satUrl);
+            hostname, wellknown, satUrl, refreshInSecs);
         lsput("trustedSATLists", trustedSATLists);
-        setTimeout(updateSATList, SAT_LIST_UPDATE_INTERVAL * 1000, hash);
+        setTimeout(updateSATList, refreshInSecs * 1000, hash);
         return "Thanks (used)";
     } else {
         log_debug("Already have mappings from this domain.");
@@ -1301,7 +1303,7 @@ function updateSATList(hash) {
     xmlHttp.responseType = 'document';
     xmlHttp.open("GET", listObj.updateURL, true);
     xmlHttp.send();
-    setTimeout(updateSATList, SAT_LIST_UPDATE_INTERVAL * 1000, hash);
+    setTimeout(updateSATList, listObj.refreshRate * 1000, hash);
 }
 
 function scheduleSATUpdates() {
@@ -1313,7 +1315,7 @@ function scheduleSATUpdates() {
         }
         let now = new Date()
         let nextUpdate = new Date(
-            (listObj.lastUpdate + SAT_LIST_UPDATE_INTERVAL) * 1000);
+            (listObj.lastUpdate + listObj,refreshRate) * 1000);
         let updateIn = nextUpdate - now;
         if (updateIn < 0) {
             updateIn = 0;

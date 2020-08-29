@@ -148,6 +148,10 @@ function handleSattestations(sat) {
         log_debug("msg does not contain labels");
         return;
     }
+    if (! "sattestor_refresh_rate" in sat) {
+        log_debug("msg does not specify a refresh rate");
+        return;
+    }
     if (! "url" in sat) {
         log_debug("msg does not contain url");
         return;
@@ -159,6 +163,11 @@ function handleSattestations(sat) {
 
     if (sat.sat_list_version !== 1) {
         log_debug("Sattestation version is not 1.");
+        return;
+    }
+
+    if (sat.sattestor_refresh_rate < 1) {
+        log_debug("Sattestation refresh rate is less than 1.");
         return;
     }
 
@@ -230,7 +239,7 @@ function handleSattestations(sat) {
         log_debug("msg does not contain sattestees");
     }
 
-    return {"url": sat.url, 'labels': sattestor_labels, "set": out, "wellknown": true, "satUrl": sat.isSatUrl};
+    return {"url": sat.url, 'labels': sattestor_labels, "refreshRate": sat.sattestor_refresh_rate, "set": out, "wellknown": true, "satUrl": sat.isSatUrl};
 }
 
 function sendSATDomainListRequest(resp) {
