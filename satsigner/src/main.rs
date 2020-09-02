@@ -374,7 +374,7 @@ fn make_sat_list(expanded_sec_key: &ExpandedSecretKey, public_key: &PublicKey, h
     format!("{{\n  \"sattestation\": {},\n  \"signature\": \"{}\"\n}}", msg, b64)
 }
 
-fn make_sat_credential(expanded_sec_key: &ExpandedSecretKey, public_key: &PublicKey, hostname: &str, onionaddr: &str, sattestations: &str, sattestor_labels: &str, sattestor_refresh_rate: &str) -> HashMap<String, String> {
+fn make_sat_credentials(expanded_sec_key: &ExpandedSecretKey, public_key: &PublicKey, hostname: &str, onionaddr: &str, sattestations: &str, sattestor_labels: &str, sattestor_refresh_rate: &str) -> HashMap<String, String> {
   let mut credentials = HashMap::new();
   for s in sattestations.split(";") {
     if s.len() == 0 {
@@ -425,6 +425,7 @@ fn make_sat_credential(expanded_sec_key: &ExpandedSecretKey, public_key: &Public
 fn make_satis_sig_v1(expanded_sec_key: &ExpandedSecretKey, public_key: &PublicKey,
                 hostname: &str, onionaddr: &str, fingerprint: &str, time: u64,
                 validity_width: u64, nonce: u32, labels: &str) -> String {
+    // TODO: move to credential format
     // Format:
     //  magic string
     //  64bit time of middle of validity window (seconds since 1970)
@@ -713,7 +714,7 @@ fn main() {
     let satlist = make_sat_list(&expanded_sec_key, &public_key, &hostname, &onionaddr, &sattestations, &sattestor_labels, &sattestor_refresh_rate);
     write_file(&outdir, "sattestation.json", &satlist);
 
-    let credentials = make_sat_credential(&expanded_sec_key, &public_key, &hostname, &onionaddr, &sattestations, &sattestor_labels, &sattestor_refresh_rate);
+    let credentials = make_sat_credentials(&expanded_sec_key, &public_key, &hostname, &onionaddr, &sattestations, &sattestor_labels, &sattestor_refresh_rate);
     for (name, credential) in &credentials {
         let outfile = format!("{}_credential.json", name);
         write_file(&outdir, &outfile, &credential);
@@ -818,7 +819,7 @@ mod tests {
           }
       };
 
-      let sat_creds = make_sat_credential(&expanded_sec_key, &public_key, hostname, onionaddr, &sattestations, "*", refresh_rate);
+      let sat_creds = make_sat_credentials(&expanded_sec_key, &public_key, hostname, onionaddr, &sattestations, "*", refresh_rate);
 
       assert!(sat_creds.len() > 0);
       let one_sat_cred = sat_creds.get(&"hllvtjcjomneltczwespyle2ihuaq5hypqaavn3is6a7t2dojuaa6rydonion.satis.system33.pw".to_string()).unwrap();
