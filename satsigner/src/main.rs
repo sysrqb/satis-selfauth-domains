@@ -374,6 +374,24 @@ fn make_sat_list(expanded_sec_key: &ExpandedSecretKey, public_key: &PublicKey, h
     format!("{{\n  \"sattestation\": {},\n  \"signature\": \"{}\"\n}}", msg, b64)
 }
 
+fn make_sat_credential(expanded_sec_key: &ExpandedSecretKey, public_key: &PublicKey, hostname: &str, onionaddr: &str, sattestor_labels: &str, sattestor_refresh_rate: &str, sattestee: &Vec<&str>) -> String {
+    let mut unsigned_credential = String::new();
+    let mut signed_credential = String::new();
+    let header = construct_sat_token_header(hostname, onionaddr, "credential", sattestor_labels, sattestor_refresh_rate, "", "");
+    let credential = construct_sat_token(&sattestee).unwrap();
+    write!(unsigned_credential, "{{{}{}}}", header, credential).expect("Writing unsigned credential failed");
+
+    let tagged_credential = format!("{}{}", "sattestation-credential-v0", unsigned_credential);
+    let sig = expanded_sec_key.sign(tagged_credential.as_bytes(), &public_key).to_bytes();
+
+    assert!(public_key.verify(tagged_credential.as_bytes(), &Signature::from_bytes(&sig).unwrap()).is_ok());
+
+    let b64_sig = base64::encode(&sig as &[u8]);
+
+    write!(signed_credential, "{{\"sattestation\":{},\"signature\":\"{}\"}}", unsigned_credential, b64_sig).expect("Writing signed credential failed");
+    base64::encode(&signed_credential.as_bytes())
+}
+
 fn make_sat_credentials(expanded_sec_key: &ExpandedSecretKey, public_key: &PublicKey, hostname: &str, onionaddr: &str, sattestations: &str, sattestor_labels: &str, sattestor_refresh_rate: &str) -> HashMap<String, String> {
   let mut credentials = HashMap::new();
   for s in sattestations.split(";") {
@@ -390,21 +408,7 @@ fn make_sat_credentials(expanded_sec_key: &ExpandedSecretKey, public_key: &Publi
     if sattestee[0].starts_with("-") {
       sattestee[0] = &sattestee[0][1..];
     }
-    let mut unsigned_credential = String::new();
-    let mut signed_credential = String::new();
-    let header = construct_sat_token_header(hostname, onionaddr, "credential", sattestor_labels, sattestor_refresh_rate, "", "");
-    let credential = construct_sat_token(&sattestee).unwrap();
-    write!(unsigned_credential, "{{{}{}}}", header, credential).expect("Writing unsigned credential failed");
-
-    let tagged_credential = format!("{}{}", "sattestation-credential-v0", unsigned_credential);
-    let sig = expanded_sec_key.sign(tagged_credential.as_bytes(), &public_key).to_bytes();
-
-    assert!(public_key.verify(tagged_credential.as_bytes(), &Signature::from_bytes(&sig).unwrap()).is_ok());
-
-    let b64_sig = base64::encode(&sig as &[u8]);
-
-    write!(signed_credential, "{{\"sattestation\":{},\"signature\":\"{}\"}}", unsigned_credential, b64_sig).expect("Writing signed credential failed");
-    let b64_credential = base64::encode(&signed_credential.as_bytes());
+    let b64_credential = make_sat_credential(expanded_sec_key, public_key, hostname, onionaddr, sattestor_labels, sattestor_refresh_rate, &sattestee);
     let sattestee_domain = sattestee[0].to_string();
     let sattestee_domain_sep = sattestee_domain.find("=");
     let sattestee_domain_sep = sattestee_domain_sep.unwrap();
