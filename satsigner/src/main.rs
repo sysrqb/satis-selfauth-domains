@@ -2,16 +2,12 @@ use std::env;
 use std::fs::File;
 use std::io::{Error as IoError, Read, Write as IoWrite, ErrorKind};
 
-use std::time::SystemTime;
-
 use std::fmt::Write as FmtWrite;
 use std::str;
 
 use std::fs::read_to_string;
 
 use std::path::Path;
-
-use rand::prelude::*;
 
 use std::collections::HashMap;
 
@@ -21,6 +17,8 @@ extern crate ed25519_dalek;
 use ed25519_dalek::ExpandedSecretKey;
 use ed25519_dalek::PublicKey;
 use ed25519_dalek::Signature;
+
+use chrono::{prelude::*,Duration};
 
 const KEY_FILE_PREFIX: &str = "hs_ed25519_";
 const SECRET_KEY_FILE_SUFFIX: &str = "secret_key";
@@ -277,7 +275,7 @@ fn print_sat_token_content(indent: &str, sattestee_token: &Vec<&str>) -> String 
 }
 
 fn construct_sat_token(sattestee: &Vec<&str>) -> Result<String, IoError> {
-    if sattestee.len() != 5 {
+    if sattestee.len() != 5 && sattestee.len() != 6 {
       return Err(IoError::new(ErrorKind::InvalidData, "Sattestee invalid length".to_string()));
     }
     let mut sat = String::new();
@@ -570,13 +568,6 @@ fn write_file(outdir: &str, path: &str, sig: &str) {
     }
 }
 
-fn now() -> u64 {
-  let sys_time = SystemTime::now();
-  sys_time.duration_since(SystemTime::UNIX_EPOCH)
-          .expect("Could not retrieve current time")
-          .as_secs()
-}
-
 fn main() {
     let args: Vec<String> = env::args().collect();
     if args.len() != 10 {
@@ -601,6 +592,7 @@ fn main() {
         Err(e) => {
             //println!("Error reading file: {}: {:?}", public_key_file_path, e);
             if e.kind() != ErrorKind::InvalidData {
+                println!("Unexpected error opening file: {}: {:?}", public_key_file_path, e);
                 return;
             }
  
@@ -680,19 +672,39 @@ fn main() {
         },
     };
 
-    let now: u64 = now();
-    const SEVEN_DAY_VALIDITY_PERIOD: u64 = 60*60*24*7;
-    let nonce: u32 = rand::thread_rng().next_u32();
-    let good_sig = make_satis_sig_v1(&expanded_sec_key, &public_key, &hostname, &onionaddr, &fingerprint, now, SEVEN_DAY_VALIDITY_PERIOD, nonce, &self_labels);
+    let oneday = Duration::days(1);
+    let today: DateTime<Utc> = Utc::now();
+    let today = today.format("%Y-%m-%d").to_string();
+    let yesterday: DateTime<Utc> = Utc::now() - oneday;
+    let yesterday = yesterday.format("%Y-%m-%d").to_string();
+    let sattestee = format!("domain={}:onion={}:fingerprint={}:labels={}:valid_after={}:refreshed_on={}",
+                            &hostname, &onionaddr, &fingerprint, &self_labels, yesterday, today);
+    let sattestee: Vec<&str> = sattestee.split(":").collect();
+    let good_sig = make_sat_credential(&expanded_sec_key, &public_key, &hostname, &onionaddr, &sattestor_labels, &sattestor_refresh_rate, &sattestee);
+    println!("Created self-sattestation");
 
     const BAD_FINGERPRINT: &'static str = "DEADBEEF111111111111";
-    let bad_fingerprint = make_satis_sig_v1(&expanded_sec_key, &public_key, &hostname, &onionaddr, BAD_FINGERPRINT, now, SEVEN_DAY_VALIDITY_PERIOD, nonce, &self_labels);
+    let sattestee = format!("domain={}:onion={}:fingerprint={}:labels={}:valid_after={}:refreshed_on={}",
+                            &hostname, &onionaddr, BAD_FINGERPRINT, &self_labels, yesterday, today);
+    let sattestee: Vec<&str> = sattestee.split(":").collect();
+    let bad_fingerprint = make_sat_credential(&expanded_sec_key, &public_key, &hostname, &onionaddr, &sattestor_labels, &sattestor_refresh_rate, &sattestee);
 
-    const BAD_TIME_CENTER: u64 = 9;
-    let bad_time = make_satis_sig_v1(&expanded_sec_key, &public_key, &hostname, &onionaddr, &fingerprint, BAD_TIME_CENTER, SEVEN_DAY_VALIDITY_PERIOD, nonce, &self_labels);
+    let ninedays = Duration::days(9);
+    let nineteendays = Duration::days(19);
+    let ninedaysago: DateTime<Utc> = Utc::now() - ninedays;
+    let nineteendaysago: DateTime<Utc> = Utc::now() - nineteendays;
+    let ninedaysago = ninedaysago.format("%Y-%m-%d").to_string();
+    let nineteendaysago = nineteendaysago.format("%Y-%m-%d").to_string();
+    let sattestee = format!("domain={}:onion={}:fingerprint={}:labels={}:valid_after={}:refreshed_on={}",
+                            &hostname, &onionaddr, &fingerprint, &self_labels, nineteendaysago, ninedaysago);
+    let sattestee: Vec<&str> = sattestee.split(":").collect();
+    let bad_time = make_sat_credential(&expanded_sec_key, &public_key, &hostname, &onionaddr, &sattestor_labels, &sattestor_refresh_rate, &sattestee);
 
     const BAD_DOMAIN: &'static str = "example.com";
-    let bad_domain = make_satis_sig_v1(&expanded_sec_key, &public_key, &BAD_DOMAIN, &onionaddr, &fingerprint, now, SEVEN_DAY_VALIDITY_PERIOD, nonce, &self_labels);
+    let sattestee = format!("domain={}:onion={}:fingerprint={}:labels={}:valid_after={}:refreshed_on={}",
+                            &BAD_DOMAIN, &onionaddr, &fingerprint, &self_labels, yesterday, today);
+    let sattestee: Vec<&str> = sattestee.split(":").collect();
+    let bad_domain = make_sat_credential(&expanded_sec_key, &public_key, &hostname, &onionaddr, &sattestor_labels, &sattestor_refresh_rate, &sattestee);
 
     let mut bad_sig = good_sig.clone();
     let middle = bad_sig.len()/2;
@@ -700,7 +712,10 @@ fn main() {
     bad_sig.insert(middle-1, c);
 
     const BAD_LABEL: &'static str = "foo";
-    let bad_label = make_satis_sig_v1(&expanded_sec_key, &public_key, &hostname, &onionaddr, &fingerprint, now, SEVEN_DAY_VALIDITY_PERIOD, nonce, BAD_LABEL);
+    let sattestee = format!("domain={}:onion={}:fingerprint={}:labels={}:valid_after={}:refreshed_on={}",
+                            &hostname, &onionaddr, &fingerprint, BAD_LABEL, yesterday, today);
+    let sattestee: Vec<&str> = sattestee.split(":").collect();
+    let bad_label = make_sat_credential(&expanded_sec_key, &public_key, &hostname, &onionaddr, &sattestor_labels, &sattestor_refresh_rate, &sattestee);
 
     write_file(&outdir, "satis_sig", &good_sig);
     write_file(&outdir, "satis_sig_bad_time", &bad_time);
