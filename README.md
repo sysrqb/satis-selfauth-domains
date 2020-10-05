@@ -43,7 +43,7 @@ https://i.imgur.com/zS4BvGQ.png
 
 ## Verify the extension is working
 
-There is some demo websites available at:
+There are some demo websites available at:
   - https://sattestorA.selfauthdomain.info
   - https://sattestee1.selfauthdomain.info
   - https://sattestorB.selfauth.site
@@ -60,9 +60,9 @@ should be allowed to work. Everything should look the same on the page.
 When at the SAT domain, visiting one of the bad links (like /baddomain.html)
 should be disallowed.
 
-At the contains some links to other SAT addresses that the owner of
-selfauth.site has verified as safe mappings. A sattestor's sattestation list is
-available at the /.well-known/sattestion.json resource. For example, at
+The above sites contain some links to other SAT addresses that the owner of
+selfauth.site has verified as correct mappings. A sattestor's sattestation list
+is available at the /.well-known/sattestion.json resource. For example, at
 https://sattestorA.selfauthdomain.info/.well-known/sattestation.json
 
 To verify the extension has automatically loaded these off the page and into
@@ -75,7 +75,7 @@ with 2 domain mappings.
 
 Assumptions:
 
-- Your satsigner souce code directory is /home/satis/src/satsigner.
+- Your satsigner source code directory is /home/satis/src/satsigner.
 - Your traditional domain is example.com.
 - Tor will generate the onion address
   rbxel6kjp4o7hz6fmy7af4nv5vyg37fnwddfxnzxqzss2h7lrkzs4rid.onion for you
@@ -83,8 +83,6 @@ Assumptions:
   /etc/letsencrypt/live/example.com/fullchain.pem
 - Your TLS fingerprint will be
   1F897271B61AFF9F581CEFE869E191C1C549C2F552757F96A75215187FA2767B
-
-## Get and build my branch of Tor
 
 ## Run satsigner
 
@@ -142,17 +140,17 @@ TLS certificate's digest occasionally.
 
 To be specific, the digest is the SHA-256 hash of the DER encoding of the certificate.
 
-      openssl x509 -inform pem -in /etc/letsencrypt/live/example.com/fullchain.pem -outform der | sha256sum | cut -c -64 | tr '[a-z]' '[A-Z]'
+      openssl x509 -inform pem -in /etc/letsencrypt/live/example.com/pubcert.pem -outform der | sha256sum | cut -c -64 | tr '[a-z]' '[A-Z]'
 
 ## Tell your webserver about the signed data
 
-satsigner has generated its signature over the appropriate data in
-satsiger_out. Now that information needs to be included in the webserver's
-configuration file.
+satsigner has generated its signature over the appropriate data in the
+satsiger_out/ directory. Now that information needs to be included in the
+webserver's configuration file.
 
 This repository includes nginx.conf.tmpl, update-satis-sig-nginx-conf.sh,
-htaccess.tmpl, and update-satis-sig-apache-conf.sh (all in server-scripts/) to get this
-data into either nginx or apache. 
+htaccess.tmpl, and update-satis-sig-apache-conf.sh (all in server-scripts/) to
+get this data into either nginx or apache.
 
 The nginx config files are not tested.
 
@@ -166,6 +164,41 @@ The nginx config files are not tested.
 
        systemctl reload httpd
 
+### Creating a new SATA header and new sattestations
+
+```
+TODAY=`date +%F`
+
+pushd /path/to/sattestee
+hash=`sudo openssl x509 -inform pem -in /etc/letsencrypt/live/example.com/pubcert.pem -outform der | sha256sum | cut -c -64 | tr '[a-z]' '[A-Z]'`
+test -f sattestation.csv.tmpl && sed 's/REFRESHDAY/'"${TODAY}"'/' sattestation.csv.tmpl > sattestation.csv
+sudo ~/satsigner /path/to/sattestee/ \
+        example.com \
+        rbxel6kjp4o7hz6fmy7af4nv5vyg37fnwddfxnzxqzss2h7lrkzs4rid \
+        ${hash} \
+        news \
+        none \
+        0 \
+        ./ ./ && ~/update-satis-sig-apache-conf.sh ./
+test -f sattestation.json && mv sattestation.json .well-known/
+test -f *_credential.json && mv *_credential.json .well-known/
+popd
+
+pushd /path/to/sattestor
+hash=`sudo openssl x509 -inform pem -in /etc/letsencrypt/live/example.org/pubcert.pem -outform der | sha256sum | cut -c -64 | tr '[a-z]' '[A-Z]'`
+test -f sattestation.csv.tmpl && sed 's/REFRESHDAY/'"${TODAY}"'/' sattestation.csv.tmpl > sattestation.csv
+sudo ~/satsigner /path/to/sattestor/ \
+        example.org \
+        ilfu36iq3wde4htupfx6kbelsdgm5tnnwddfxnzxqzss2h7lrkzs4rid \
+        ${hash} \
+        sattestation \
+        "news,sattestor(rbxel6kjp4o7hz6fmy7af4nv5vyg37fnwddfxnzxqzss2h7lrkzs4ridonion.example.com" \
+        5 \
+        ./ ./ && ~/update-satis-sig-apache-conf.sh ./
+test -f sattestation.json && mv sattestation.json .well-known/
+test -f *_credential.json && mv *_credential.json .well-known/
+popd
+```
 
 ### get that into nginx's config (previous instructions, not tested recently)
 
